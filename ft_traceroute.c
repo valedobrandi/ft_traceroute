@@ -49,11 +49,11 @@ struct sockaddr_in	ft_getaddrinfo(char *host)
 	return (dest);
 }
 
-void	setttl(int sockfd, int ttl)
+void	set_ttl(int sockfd, int ttl)
 {
 	if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
 	{
-		perror("setsockopt");
+		printf("setsockopt");
 		exit(1);
 	}
 }
@@ -87,7 +87,7 @@ int	build_packet(char *buffer, int seq)
 	icmp->identifier = htons(getpid() & 0xFFFF);
 	icmp->sequence = htons(seq);
 	memset(buffer + sizeof(*icmp), 0, 56);
-	packet = sizeof(*icmp) + 56;
+	packet = sizeof(*icmp) + 52;
 	icmp->checksum = 0;
 	icmp->checksum = checksum(buffer, packet);
 	return (packet);
@@ -106,7 +106,8 @@ struct s_socket_header parse_header(char *buffer)
 int	main(int argc, char **argv)
 {
 	int sockfd;
-	char buffer[1024];
+	char sender[1024];
+	char receiver[1024];
 
 	t_args args = {0};
 	t_arg42_args main_args = {argc, argv};
@@ -133,41 +134,50 @@ int	main(int argc, char **argv)
 		exit(1);
 	}
 
-	
 
-	printf("\ntraceroute to %s (%s), %d hops max\n", args.host,
-		inet_ntoa(dest.sin_addr), 30);
+	printf("traceroute to %s (%s), %d hops max %d bytes packets\n", args.host,
+		inet_ntoa(dest.sin_addr), 30, 60);
 
-    uint16_t seq = 0;
-	while (args.ttl <= 30)
+    int seq = 1;
+	while (seq <= 30)
 	{
-        setttl(sockfd, args.ttl);
-		int packet_size = build_packet(buffer, args.ttl);
-		if (sendto(sockfd, buffer, packet_size, 0, (struct sockaddr *)&dest,
-				sizeof(dest)) <= 0)
-		{
-			perror("Send error");
-		}
+		int packet_size = build_packet(sender, seq);
+        set_ttl(sockfd, seq);
+
+		sendto(sockfd, sender, packet_size, 0, (struct sockaddr *)&dest, sizeof(dest));
+
+		fd_set rfds;
+		FD_ZERO(&rfds);
+		FD_SET(sockfd, &rfds);
+
+		struct timeval packet_timeout = {1, 0};
+
+		int retval = select(sockfd + 1, &rfds, NULL, NULL, &packet_timeout);
+		if (retval == 0) {
+			printf("%d ***\n", seq);
+		} else if (retval < 0) {
+			perror("select");
+			exit(1);
+		} 
+			
 
 		struct sockaddr_in r_addr;
 		socklen_t len = sizeof(r_addr);
-		ssize_t bytes_received = recvfrom(sockfd, buffer, sizeof(buffer), 0,
-				(struct sockaddr *)&r_addr, &len);
 
-		if (bytes_received < 0)
-		{
-			perror("Receive error");
-			continue ;
+		recvfrom(sockfd, receiver, sizeof(receiver), 0, (struct sockaddr *)&r_addr, &len);
+		
+		struct s_socket_header packet_recv = parse_header(receiver);
+		
+		int type = packet_recv.icmpHeader->type;
+
+		
+		
+		if (type == ICMP_TIME_EXCEEDED) {
+			printf("%2d  %s", seq, inet_ntoa(r_addr.sin_addr));
 		}
-
-		struct s_socket_header packet_recv = parse_header(buffer);
-
-        if (packet_recv.icmpHeader->type == ICMP_TIME_EXCEEDED) {
-            printf("%d %s (%s)\n", seq, inet_ntoa(r_addr.sin_addr), inet_ntoa(dest.sin_addr));
-        }
-		args.ttl++;
+		printf("\n");
 		seq++;
-		sleep(1);
+		
 	}
 	return (0);
 }

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/select.h>
 
 
 struct s_socket_header
@@ -39,4 +40,9 @@ typedef struct s_icmp
     uint16_t sequence;
 } t_icmp;
 
+int verify_checksum(struct icmphdr *icmp, int len) ;
+int build_packet(char *buffer, int seq);
+struct s_socket_header parse_header(char *buffer);
+uint16_t checksum(void *b, int len);
+char *ft_print_icmp_error(int type, int code);
 #endif

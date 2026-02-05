@@ -1,7 +1,7 @@
 NAME = ft_traceroute
 CC = cc
 CFLAGS = -Wall -Wextra -Werror
-SRCS = ft_traceroute.c argparse.c 
+SRCS = ft_traceroute.c argparse.c error.c
 OBJS = $(SRCS:.c=.o)
 
 INCLUDES = -I.
