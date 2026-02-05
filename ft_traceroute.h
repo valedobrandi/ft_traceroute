@@ -4,9 +4,20 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip_icmp.h> 
+#include <netinet/ip.h>
 #include <netdb.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+
+struct s_socket_header
+{
+    struct iphdr *ipHeader;
+    struct icmphdr *icmpHeader;
+    char *payload;
+};
 
 typedef struct s_args
 {
