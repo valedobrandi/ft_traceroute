@@ -109,25 +109,3 @@ Example:
 ```bash
 sudo ./ft_traceroute 8.8.8.8
 ```
-
-Automation: simple shell scripts can automate runs against controlled targets and validate output.
-
-## Best practices & next steps (optional / bonus)
-
-- Add IPv6 support
-- Support multiple probe types (ICMP Echo, UDP, TCP SYN)
-- Improve timing/metrics reporting (statistics, percentiles)
-- Implement adaptive timeouts and retransmissions
-
-## Author
-
-Implementation by: (your name) — add your name / 42 ID here.
-
-## License
-
-For study purposes. Choose or add a license as needed.
-
----
-
-Note: This README is written in the 42 project style (clear build/run steps, constraints). If you want, I can update the flags section to reflect exactly what's implemented by reading `argparse.c` and adjusting usage examples.
-
