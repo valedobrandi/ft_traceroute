@@ -49,6 +49,27 @@ struct sockaddr_in	ft_getaddrinfo(char *host)
 	return (dest);
 }
 
+struct sockaddr_in	ft_getnameinfo(char *host)
+{
+	struct sockaddr_in	dest;
+	int					getaddrinfo_result;
+
+	struct addrinfo addressInfoHints, *addrInfoPointer;
+	memset(&addressInfoHints, 0, sizeof(addressInfoHints));
+	addressInfoHints.ai_family = AF_INET;
+	addressInfoHints.ai_socktype = SOCK_RAW;
+	getaddrinfo_result = getaddrinfo(host, NULL, &addressInfoHints,
+			&addrInfoPointer);
+	if (getaddrinfo_result != 0)
+	{
+		fprintf(stderr, "ft_traceroute: unknown host\n");
+		exit(1);
+	}
+	memcpy(&dest, addrInfoPointer->ai_addr, sizeof(struct sockaddr_in));
+	freeaddrinfo(addrInfoPointer);
+	return (dest);
+}
+
 void	set_ttl(int sockfd, int ttl)
 {
 	if (setsockopt(sockfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
@@ -144,37 +165,57 @@ int	main(int argc, char **argv)
 		int packet_size = build_packet(sender, seq);
         set_ttl(sockfd, seq);
 
-		sendto(sockfd, sender, packet_size, 0, (struct sockaddr *)&dest, sizeof(dest));
+        int packet = 3;
 
-		fd_set rfds;
-		FD_ZERO(&rfds);
-		FD_SET(sockfd, &rfds);
+        while (packet > 0) {
+            struct timeval start, now, timeout;
 
-		struct timeval packet_timeout = {1, 0};
+            // Set timeout for select 0.5 second timeout
+            timeout.tv_sec = 0; 
+            timeout.tv_usec = 500000;
 
-		int retval = select(sockfd + 1, &rfds, NULL, NULL, &packet_timeout);
-		if (retval == 0) {
-			printf("%d ***\n", seq);
-		} else if (retval < 0) {
-			perror("select");
-			exit(1);
-		} 
+            gettimeofday(&start, NULL);
+            gettimeofday(&now, NULL);
+
+            sendto(sockfd, sender, packet_size, 0, (struct sockaddr *)&dest, sizeof(dest));
+            
+            fd_set rfds;
+            FD_ZERO(&rfds);
+            FD_SET(sockfd, &rfds);
+            
+            int retval = select(sockfd + 1, &rfds, NULL, NULL, &timeout);
+            if (retval == 0) {
+                printf("%d ***\n", seq);
+            } else if (retval < 0) {
+                perror("select");
+                exit(1);
+            } 
 			
-
-		struct sockaddr_in r_addr;
-		socklen_t len = sizeof(r_addr);
-
-		recvfrom(sockfd, receiver, sizeof(receiver), 0, (struct sockaddr *)&r_addr, &len);
-		
-		struct s_socket_header packet_recv = parse_header(receiver);
-		
-		int type = packet_recv.icmpHeader->type;
-
-		
-		
-		if (type == ICMP_TIME_EXCEEDED) {
-			printf("%2d  %s", seq, inet_ntoa(r_addr.sin_addr));
-		}
+            
+            struct sockaddr_in r_addr;
+            socklen_t len = sizeof(r_addr);
+            
+            recvfrom(sockfd, receiver, sizeof(receiver), 0, (struct sockaddr *)&r_addr, &len);
+            size_t elapsed_time = (now.tv_sec - start.tv_sec) + (now.tv_usec - start.tv_usec) / 1000000.0;
+            
+            struct s_socket_header packet_recv = parse_header(receiver);
+            
+            int type = packet_recv.icmpHeader->type;
+            
+            struct sockaddr_in dest = ft_getaddrinfo(args.host);
+            if (type == ICMP_TIME_EXCEEDED) {
+                if (packet == 3) {
+                    printf("%2d  %s ", seq, inet_ntoa(r_addr.sin_addr));
+                }
+                printf(" %.3ld ms", elapsed_time);
+            } else if (type == ICMP_ECHOREPLY) {
+                if (packet == 3) {
+                    printf("%2d  %s", seq, inet_ntoa(r_addr.sin_addr));
+                }
+                printf(" %.3ld ms", elapsed_time);
+            }
+            packet--;
+        }
 		printf("\n");
 		seq++;
 		

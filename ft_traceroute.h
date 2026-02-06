@@ -2,6 +2,7 @@
 #define FT_TRACEROUTE_H
 
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/ip_icmp.h> 
 #include <netinet/ip.h>
