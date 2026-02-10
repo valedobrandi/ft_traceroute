@@ -1,6 +1,6 @@
 NAME = ft_traceroute
 CC = cc
-CFLAGS = -Wall -Wextra -Werror
+# CFLAGS = -Wall -Wextra -Werror
 SRCS = ft_traceroute.c argparse.c error.c
 OBJS = $(SRCS:.c=.o)
 
@@ -11,10 +11,10 @@ INCLUDES = -I.
 all: $(NAME)
 
 $(NAME): $(OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ -lm
+	$(CC) $(INCLUDES) -o $@ $^ -lm
 
 %.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@ 
+	$(CC) $(INCLUDES) -c $< -o $@ 
 
 clean:
 	rm -f $(OBJS)
