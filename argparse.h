@@ -13,7 +13,7 @@
 
 typedef struct s_arg42
 {
-    char *cursive;
+    char *name;
     char alias;
     char *arg;
     const char *helper;

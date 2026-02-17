@@ -1,49 +1,59 @@
 #ifndef FT_TRACEROUTE_H
 #define FT_TRACEROUTE_H
 
-#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/ip_icmp.h> 
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netdb.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/select.h>
 
+#define ICMP_MINLEN 8
+#define CAPTURE_LEN 136
 
-struct s_socket_header
+struct udphdr
 {
-    struct iphdr *ipHeader;
-    struct icmphdr *icmpHeader;
-    char *payload;
+    uint16_t uh_sport;
+    uint16_t uh_dport;
+    uint16_t uh_ulen;
+    uint16_t uh_sum;
 };
+
+typedef struct icmphdr
+{
+    uint8_t type;
+    uint8_t code;
+    uint16_t checksum;
+    union
+    {
+        struct
+        {
+            uint16_t id;
+            uint16_t sequence;
+        } echo;
+        uint32_t gateway;
+        struct
+        {
+            uint16_t __unused;
+            uint16_t mtu;
+        } frag;
+    } un;
+} icmphdr_t;
 
 typedef struct s_args
 {
     int helper;
-    int ttl;
     char *host;
-}   t_args;
+} t_args;
 
-typedef struct s_opts {
+typedef struct s_opts
+{
     int helper;
 } t_opts;
 
-typedef struct s_icmp
-{
-    uint8_t  type;
-    uint8_t  code;
-    uint16_t checksum;
-    uint16_t identifier;
-    uint16_t sequence;
-} t_icmp;
-
-int verify_checksum(struct icmphdr *icmp, int len) ;
-int build_packet(char *buffer, int seq);
-struct s_socket_header parse_header(char *buffer);
-uint16_t checksum(void *b, int len);
-char *ft_print_icmp_error(int type, int code);
 #endif

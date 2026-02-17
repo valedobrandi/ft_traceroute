@@ -1,4 +1,5 @@
-#include "ft_traceroute.h"
+#include <linux/icmp.h>
+#include <stddef.h>
 
 struct icmp_code_descr
 {

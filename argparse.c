@@ -72,8 +72,13 @@ size_t parse_number(const char *optarg, size_t max, int allow_zero)
 void
 print_help(t_arg42 *opts)
 {
-    printf("Usage: ./ft_ping [OPTIONS] host\n\nOptions:\n");
+    printf("Usage: ./ft_traceroute [OPTION...] HOST\n");
+    printf("Print the route packets trace to network host.\n\n");
     for (int i = 0; opts[i].alias; i++) {
-        printf("-%c: %s\n", opts[i].alias, opts[i].helper);
+        if (opts[i].alias)
+            printf("  -%c, ", opts[i].alias);
+        if (opts[i].name)
+            printf("--%s: ", opts[i].name);
+        printf("%s\n", opts[i].helper);
     }
 }
