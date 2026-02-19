@@ -12,7 +12,6 @@ static int handle_options(int key, char *arg, void *user)
     args = user;
     switch (key)
     {
-    case '?':
     case 'h':
         args->helper = 1;
         break;
@@ -27,24 +26,45 @@ static int handle_options(int key, char *arg, void *user)
     return (0);
 }
 
-int icmp_generic_decode(unsigned char *buffer, struct udphdr **orig_udp, struct ip **ipp, icmphdr_t **icmpp)
+int icmp_generic_decode(unsigned char *buffer, int sin_port, int *type, size_t nbytes)
 {
+    // Minimum size IP header.
+    if (nbytes < sizeof(struct ip))
+        return -1;
+
     struct ip *ip = (struct ip *)buffer;
     size_t hlen = ip->ip_hl << 2;
 
+    // Minimum size ICMP header.
+    if (nbytes < hlen + 8)
+        return -1;
+
     icmphdr_t *icmp = (icmphdr_t *)(buffer + hlen);
-    *ipp = ip;
-    *icmpp = icmp;
+    *type = icmp->type;
 
     if (icmp->type == 11 || icmp->type == 3)
     {
-        struct ip *inner_ip = (struct ip *)(buffer + hlen + 8);
+        // Minimum size inner IP header.
+        size_t inner_ip_offset = hlen + 8;
+        if (nbytes < inner_ip_offset + sizeof(struct ip))
+            return -1;
+
+        struct ip *inner_ip = (struct ip *)(buffer + inner_ip_offset);
         int inner_hlen = inner_ip->ip_hl << 2;
-        *orig_udp = (struct udphdr *)((unsigned char *)inner_ip + inner_hlen);
+
+        // Minimum size inner UDP header.
+        if (nbytes < inner_ip_offset + inner_hlen + sizeof(struct udphdr))
+            return -1;
+
+        struct udphdr *orig_udp = (struct udphdr *)((unsigned char *)inner_ip + inner_hlen);
+
+        // Check if the original UDP packet's destination port matches the one we sent.
+        if (orig_udp->uh_dport != sin_port)
+            return -1;
+
         return 0;
     }
 
-    *orig_udp = NULL;
     return -1;
 }
 
@@ -77,6 +97,12 @@ int main(int argc, char **argv)
 
     int recv_sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 
+    if (send_sock < 0 || recv_sock < 0)
+    {
+        perror("socket");
+        exit(1);
+    }
+
     struct addrinfo hints, *res;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -98,7 +124,7 @@ int main(int argc, char **argv)
     for (int ttl = 1; ttl <= 64; ttl++)
     {
         int type = 0;
-        struct udphdr *orig_udp = NULL;
+
         printf(" %2d  ", ttl);
         uint32_t prev_addr = 0;
         for (int probe = 0; probe < 3; probe++)
@@ -110,7 +136,11 @@ int main(int argc, char **argv)
 
             char payload[56] = {0};
             gettimeofday(&start, NULL);
-            sendto(send_sock, payload, sizeof(payload), 0, (struct sockaddr *)&dest, sizeof(dest));
+            if (sendto(send_sock, payload, sizeof(payload), 0, (struct sockaddr *)&dest, sizeof(dest)) < 0)
+            {
+                perror("sendto");
+                exit(1);
+            }
 
             fd_set fds;
             FD_ZERO(&fds);
@@ -125,24 +155,17 @@ int main(int argc, char **argv)
                 continue;
             }
 
-            unsigned char buf[CAPTURE_LEN] = {0};
+            unsigned char buffer[CAPTURE_LEN] = {0};
             struct sockaddr_in from;
             socklen_t reply_len = sizeof(from);
 
-            ssize_t n = recvfrom(recv_sock, buf, sizeof(buf), 0,
+            ssize_t n = recvfrom(recv_sock, buffer, sizeof(buffer), 0,
                                  (struct sockaddr *)&from, &reply_len);
             if (n < 0)
                 exit(EXIT_FAILURE);
 
-            struct ip *ip;
-            icmphdr_t *ic;
-
-            if(icmp_generic_decode(buf, &orig_udp, &ip, &ic) != 0 || !orig_udp)
+            if (icmp_generic_decode(buffer, dest.sin_port, &type, n) != 0)
                 continue;
-            if (orig_udp->uh_dport != dest.sin_port)
-                continue;
-
-            type = ic->type;
 
             gettimeofday(&now, NULL);
 
